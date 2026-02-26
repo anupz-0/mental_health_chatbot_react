@@ -64,7 +64,7 @@ Feel free to share what's on your mind today. You can type your message or use t
     }]);
     
     try {
-      const res = await fetch(`${API_BASE}/predict-all`, {
+      const res = await fetch(`${API_BASE}/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
