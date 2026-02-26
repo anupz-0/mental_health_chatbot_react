@@ -6,7 +6,6 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
   const [history, setHistory] = useState([]);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  // Load history from localStorage
   useEffect(() => {
     loadHistory();
   }, []);
@@ -16,7 +15,7 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
     if (savedHistory) {
       try {
         const parsed = JSON.parse(savedHistory);
-        setHistory(parsed.reverse()); // Show newest first
+        setHistory(parsed.reverse());
       } catch (e) {
         console.error('Error loading history:', e);
         setHistory([]);
@@ -26,16 +25,13 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
     }
   };
 
-  // ⭐ Clear all history
   const clearHistory = () => {
     localStorage.removeItem('analysisHistory');
     localStorage.removeItem('latestAnalysis');
     setHistory([]);
     setShowClearConfirm(false);
-    console.log('✅ History cleared');
   };
 
-  // Format timestamp
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -48,42 +44,33 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
     if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
     if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
     if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    
     return date.toLocaleDateString();
   };
 
-  // Get emotion color
   const getEmotionColor = (emotion) => {
     const colors = {
-      'joy': 'text-yellow-400',
-      'sadness': 'text-blue-400',
-      'anger': 'text-red-400',
-      'fear': 'text-purple-400',
-      'surprise': 'text-green-400',
-      'disgust': 'text-orange-400',
+      'joy': 'text-yellow-400', 'sadness': 'text-blue-400',
+      'anger': 'text-red-400', 'fear': 'text-purple-400',
+      'surprise': 'text-green-400', 'disgust': 'text-orange-400',
       'neutral': 'text-gray-400',
     };
-    return colors[emotion.toLowerCase()] || 'text-purple-400';
+    return colors[emotion?.toLowerCase()] || 'text-purple-400';
   };
 
-  // Get mental state color
   const getMentalStateColor = (state) => {
     const colors = {
-      'normal': 'text-green-400',
-      'anxiety': 'text-yellow-400',
-      'depression': 'text-blue-400',
-      'stress': 'text-red-400',
-      'bipolar': 'text-purple-400',
-      'suicidal': 'text-red-600',
+      'normal': 'text-green-400', 'anxiety': 'text-yellow-400',
+      'depression': 'text-blue-400', 'stress': 'text-red-400',
+      'bipolar': 'text-purple-400', 'suicidal': 'text-red-600',
+      'personality disorder': 'text-pink-400',
     };
-    return colors[state.toLowerCase()] || 'text-purple-400';
+    return colors[state?.toLowerCase()] || 'text-purple-400';
   };
 
   return (
     <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
-      
-      {/* Sidebar */}
-      <Sidebar 
+
+      <Sidebar
         onHomeClick={onHomeClick}
         onMentalStateClick={onMentalStateClick}
         onHistoryClick={onHistoryClick}
@@ -96,8 +83,8 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
         {/* Animated Stars */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
-            <div 
-              key={i} 
+            <div
+              key={i}
               className="absolute bg-white rounded-full opacity-30 animate-pulse"
               style={{
                 width: `${Math.random() * 2 + 1}px`,
@@ -118,13 +105,11 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
                 Analysis History
               </h1>
               <p className="text-purple-300/60 mt-1">
-                {history.length > 0 
+                {history.length > 0
                   ? `${history.length} conversation${history.length !== 1 ? 's' : ''} analyzed`
                   : 'No analysis history yet'}
               </p>
             </div>
-
-            {/* Clear Button */}
             {history.length > 0 && (
               <button
                 onClick={() => setShowClearConfirm(true)}
@@ -137,7 +122,7 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
           </div>
         </div>
 
-        {/* ⭐ Clear Confirmation Modal */}
+        {/* Clear Confirmation Modal */}
         {showClearConfirm && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <div className="bg-[#1a1035] border border-purple-500/30 rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
@@ -165,9 +150,8 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 relative z-10">
-          
+
           {history.length === 0 ? (
-            // Empty State
             <div className="flex flex-col items-center justify-center h-full text-center">
               <div className="w-24 h-24 bg-purple-600/20 rounded-full flex items-center justify-center mb-4">
                 <FaClock className="text-5xl text-purple-400" />
@@ -184,7 +168,6 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
               </button>
             </div>
           ) : (
-            // History Timeline
             <div className="max-w-4xl mx-auto space-y-4">
               {history.map((item, index) => (
                 <div
@@ -192,12 +175,10 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
                   className="bg-[#1a1035]/60 border border-purple-500/20 rounded-2xl p-5 backdrop-blur-md hover:border-purple-500/40 transition-all animate-fadeIn"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 text-purple-300/60 text-sm">
-                      <FaClock className="text-xs" />
-                      {formatTime(item.timestamp)}
-                    </div>
+                  {/* Timestamp */}
+                  <div className="flex items-center gap-2 text-purple-300/60 text-sm mb-3">
+                    <FaClock className="text-xs" />
+                    {formatTime(item.timestamp)}
                   </div>
 
                   {/* User Text */}
@@ -209,20 +190,32 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
 
                   {/* Analysis Results */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
-                    {/* Emotion */}
-                    <div className="bg-[#0a0515]/50 rounded-xl p-4 border border-purple-500/10">
-                      <div className="flex items-center gap-2 mb-2">
-                        <FaSmile className="text-purple-400" />
-                        <span className="text-purple-300/80 text-sm font-semibold">Emotion</span>
+
+                    {/* ── null check for emotion ── */}
+                    {item.emotion ? (
+                      <div className="bg-[#0a0515]/50 rounded-xl p-4 border border-purple-500/10">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FaSmile className="text-purple-400" />
+                          <span className="text-purple-300/80 text-sm font-semibold">Emotion</span>
+                        </div>
+                        <div className={`text-2xl font-bold ${getEmotionColor(item.emotion.rawLabel)}`}>
+                          {item.emotion.label}
+                        </div>
+                        <div className="text-purple-300/60 text-sm mt-1">
+                          {item.emotion.confidence}% confidence
+                        </div>
                       </div>
-                      <div className={`text-2xl font-bold ${getEmotionColor(item.emotion.label)}`}>
-                        {item.emotion.label}
+                    ) : (
+                      <div className="bg-[#0a0515]/50 rounded-xl p-4 border border-purple-500/10">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FaSmile className="text-purple-400" />
+                          <span className="text-purple-300/80 text-sm font-semibold">Emotion</span>
+                        </div>
+                        <div className="text-purple-300/60 text-sm mt-1">
+                          Not available
+                        </div>
                       </div>
-                      <div className="text-purple-300/60 text-sm mt-1">
-                        {item.emotion.confidence}% confidence
-                      </div>
-                    </div>
+                    )}
 
                     {/* Mental State */}
                     <div className="bg-[#0a0515]/50 rounded-xl p-4 border border-purple-500/10">
@@ -230,7 +223,7 @@ const HistoryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, 
                         <FaBrain className="text-purple-400" />
                         <span className="text-purple-300/80 text-sm font-semibold">Mental State</span>
                       </div>
-                      <div className={`text-2xl font-bold ${getMentalStateColor(item.mentalHealth.label)}`}>
+                      <div className={`text-2xl font-bold ${getMentalStateColor(item.mentalHealth.rawLabel)}`}>
                         {item.mentalHealth.label}
                       </div>
                       <div className="text-purple-300/60 text-sm mt-1">

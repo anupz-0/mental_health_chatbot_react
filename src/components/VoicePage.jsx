@@ -93,7 +93,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     }]);
     
     try {
-      const res = await fetch(`${API_BASE}/predict-all`, {
+      const res = await fetch(`${API_BASE}/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
@@ -104,24 +104,24 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       }
       
       const data = await res.json();
-      console.log('✅ Analysis complete:', data.emotion?.label, '/', data.mental_health?.mental_state);
+      console.log('✅ Analysis complete:', data.emotion?.label, '/', data.mental_state?.label);
       
       const analysisData = {
-        timestamp: new Date().toISOString(),
-        userText: text,
-        emotion: {
-          label: formatLabel(data.emotion?.label || 'unknown'),
-          confidence: ((data.emotion?.score || 0) * 100).toFixed(1),
-          rawLabel: data.emotion?.label || 'unknown',
-          rawScore: data.emotion?.score || 0
-        },
-        mentalHealth: {
-          label: formatLabel(data.mental_health?.mental_state || 'unknown'),
-          confidence: ((data.mental_health?.confidence || 0) * 100).toFixed(1),
-          rawLabel: data.mental_health?.mental_state || 'unknown',
-          rawScore: data.mental_health?.confidence || 0
-        }
-      };
+         timestamp: new Date().toISOString(),
+          userText: text,
+          emotion: {
+            label: formatLabel(data.emotion?.label || 'unknown'),
+            confidence: ((data.emotion?.confidence || 0) * 100).toFixed(1),
+            rawLabel: data.emotion?.label || 'unknown',
+            rawScore: data.emotion?.confidence || 0
+          },
+       mentalHealth: {
+            label: formatLabel(data.mental_state?.label || 'unknown'),
+            confidence: ((data.mental_state?.confidence || 0) * 100).toFixed(1),
+            rawLabel: data.mental_state?.label || 'unknown',
+            rawScore: data.mental_state?.confidence || 0
+         }
+      };;
       
       localStorage.setItem('latestAnalysis', JSON.stringify(analysisData));
       

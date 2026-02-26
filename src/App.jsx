@@ -12,7 +12,7 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false); // ⭐ NEW: Track analysis state
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentPage, setCurrentPage] = useState('home');
   const messagesEndRef = useRef(null);
 
@@ -27,8 +27,7 @@ function App() {
     const timer = setTimeout(() => {
       setMessages([
         {
-          text: `Hello! I'm here to listen and support you.
-Feel free to share what's on your mind today. You can type your message or use the speak button to talk to me directly.`,
+          text: `Hello! I'm here to listen and support you.\nFeel free to share what's on your mind today. You can type your message or use the speak button to talk to me directly.`,
           sender: 'bot'
         }
       ]);
@@ -38,7 +37,7 @@ Feel free to share what's on your mind today. You can type your message or use t
     return () => clearTimeout(timer);
   }, []);
 
-  // ⭐ Format label for display
+  // Format label for display
   const formatLabel = (str) => {
     return str
       .replace(/_/g, ' ')
@@ -47,7 +46,7 @@ Feel free to share what's on your mind today. You can type your message or use t
       .join(' ');
   };
 
-  // ⭐ Analyze text with API (same as VoicePage)
+  // Analyze text with API
   const analyzeText = async (text) => {
     if (!text.trim()) {
       console.log('⚠️ No text to analyze');
@@ -56,64 +55,82 @@ Feel free to share what's on your mind today. You can type your message or use t
 
     console.log('🧠 Starting analysis:', text.length, 'chars');
     setIsAnalyzing(true);
-    
+
     // Show analyzing message
-    setMessages(prev => [...prev, { 
-      text: "Analyzing your message...", 
-      sender: 'bot' 
+    setMessages(prev => [...prev, {
+      text: "Analyzing your message...",
+      sender: 'bot'
     }]);
-    
+
     try {
       const res = await fetch(`${API_BASE}/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
       });
-      
+
       if (!res.ok) {
         throw new Error(`Server error: ${res.status}`);
       }
-      
+
       const data = await res.json();
-      console.log('✅ Analysis complete:', data.emotion?.label, '/', data.mental_health?.mental_state);
-      
+      console.log('✅ Analysis complete:', data);
+
+      // ── Correct API response format (v5) ──────────────────
+      // data.mental_state.label       → mental health label
+      // data.mental_state.confidence  → confidence 0-1
+      // data.emotion.label            → emotion label (null if Suicidal)
+      // data.emotion.confidence       → emotion confidence
+      // data.high_risk                → true if Suicidal
+      // data.suicidal_signal.detected → true if Suicidal
+      // ──────────────────────────────────────────────────────
+
+      const mentalLabel = data.mental_state?.label || 'Unknown';
+      const mentalConf  = data.mental_state?.confidence || 0;
+      const emotionLabel = data.emotion?.label || null;
+      const emotionConf  = data.emotion?.confidence || 0;
+      const isHighRisk   = data.high_risk || false;
+
       const analysisData = {
         timestamp: new Date().toISOString(),
         userText: text,
-        emotion: {
-          label: formatLabel(data.emotion?.label || 'unknown'),
-          confidence: ((data.emotion?.score || 0) * 100).toFixed(1),
-          rawLabel: data.emotion?.label || 'unknown',
-          rawScore: data.emotion?.score || 0
-        },
+        highRisk: isHighRisk,
+        emotion: emotionLabel ? {
+          label     : formatLabel(emotionLabel),
+          confidence: (emotionConf * 100).toFixed(1),
+          rawLabel  : emotionLabel,
+          rawScore  : emotionConf
+        } : null,
         mentalHealth: {
-          label: formatLabel(data.mental_health?.mental_state || 'unknown'),
-          confidence: ((data.mental_health?.confidence || 0) * 100).toFixed(1),
-          rawLabel: data.mental_health?.mental_state || 'unknown',
-          rawScore: data.mental_health?.confidence || 0
+          label     : formatLabel(mentalLabel),
+          confidence: (mentalConf * 100).toFixed(1),
+          rawLabel  : mentalLabel,
+          rawScore  : mentalConf,
+          riskLevel : data.mental_state?.risk_level || 'Low',
+          allScores : data.mental_state?.all_scores || {}
         }
       };
-      
-      // ⭐ Store in localStorage (same as VoicePage)
+
+      // Store in localStorage
       localStorage.setItem('latestAnalysis', JSON.stringify(analysisData));
-      
+
       const history = JSON.parse(localStorage.getItem('analysisHistory') || '[]');
       history.push(analysisData);
       if (history.length > 10) history.shift();
       localStorage.setItem('analysisHistory', JSON.stringify(history));
-      
-      // Update the analyzing message to show completion
+
+      // Update analyzing message
       setTimeout(() => {
         setMessages(prev => {
           const newMessages = [...prev];
           newMessages[newMessages.length - 1] = {
-            text: "Analysis complete! Click 'Mental State' in sidebar to see your emotional analysis and mental health assessment.",
+            text: "Analysis complete! Click 'Mental State' in the sidebar to see your emotional analysis and mental health assessment.",
             sender: 'bot'
           };
           return newMessages;
         });
       }, 500);
-      
+
     } catch (e) {
       console.error('❌ Analysis failed:', e);
       setMessages(prev => {
@@ -129,52 +146,33 @@ Feel free to share what's on your mind today. You can type your message or use t
     }
   };
 
-  // ⭐ Updated sendMessage with analysis
+  // Send message
   const sendMessage = () => {
     if (!message.trim()) return;
-    
+
     const userMessage = message.trim();
-    
+
     // Add user message
     setMessages(prev => [...prev, { text: userMessage, sender: 'user' }]);
-    
+
     // Clear input
     setMessage('');
-    
-    // ⭐ Analyze the message
+
+    // Analyze the message
     analyzeText(userMessage);
   };
 
-  // Navigation handlers for all pages
-  const handleHomeClick = () => {
-    console.log('Navigating to Home');
-    setCurrentPage('home');
-  };
+  // Navigation handlers
+  const handleHomeClick        = () => setCurrentPage('home');
+  const handleVoiceClick       = () => setCurrentPage('voice');
+  const handleMentalStateClick = () => setCurrentPage('mental-state');
+  const handleHistoryClick     = () => setCurrentPage('history');
+  const handleFAQsClick        = () => setCurrentPage('faqs');
 
-  const handleVoiceClick = () => {
-    console.log('Navigating to Voice');
-    setCurrentPage('voice');
-  };
-
-  const handleMentalStateClick = () => {
-    console.log('Navigating to Mental State');
-    setCurrentPage('mental-state');
-  };
-
-  const handleHistoryClick = () => {
-    console.log('Navigating to History');
-    setCurrentPage('history');
-  };
-
-  const handleFAQsClick = () => {
-    console.log('Navigating to FAQs');
-    setCurrentPage('faqs');
-  };
-
-  // Render VoicePage
+  // Render pages
   if (currentPage === 'voice') {
     return (
-      <VoicePage 
+      <VoicePage
         onBack={handleHomeClick}
         onHomeClick={handleHomeClick}
         onMentalStateClick={handleMentalStateClick}
@@ -184,10 +182,9 @@ Feel free to share what's on your mind today. You can type your message or use t
     );
   }
 
-  // Render MentalStatePage
   if (currentPage === 'mental-state') {
     return (
-      <MentalStatePage 
+      <MentalStatePage
         onBack={handleHomeClick}
         onHomeClick={handleHomeClick}
         onMentalStateClick={handleMentalStateClick}
@@ -197,10 +194,9 @@ Feel free to share what's on your mind today. You can type your message or use t
     );
   }
 
-  // Render HistoryPage
   if (currentPage === 'history') {
     return (
-      <HistoryPage 
+      <HistoryPage
         onBack={handleHomeClick}
         onHomeClick={handleHomeClick}
         onMentalStateClick={handleMentalStateClick}
@@ -210,10 +206,9 @@ Feel free to share what's on your mind today. You can type your message or use t
     );
   }
 
-  // Render FAQsPage
   if (currentPage === 'faqs') {
     return (
-      <FAQsPage 
+      <FAQsPage
         onBack={handleHomeClick}
         onHomeClick={handleHomeClick}
         onMentalStateClick={handleMentalStateClick}
@@ -223,12 +218,12 @@ Feel free to share what's on your mind today. You can type your message or use t
     );
   }
 
-  // Render Home Page (default)
+  // Home Page
   return (
     <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
 
-      {/* Sidebar - Pass all navigation handlers */}
-      <Sidebar 
+      {/* Sidebar */}
+      <Sidebar
         onHomeClick={handleHomeClick}
         onMentalStateClick={handleMentalStateClick}
         onHistoryClick={handleHistoryClick}
@@ -239,7 +234,7 @@ Feel free to share what's on your mind today. You can type your message or use t
       {/* Main Content */}
       <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
 
-        {/* ⭐ Animated Stars */}
+        {/* Animated Stars */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
             <div
@@ -294,7 +289,7 @@ Feel free to share what's on your mind today. You can type your message or use t
             </div>
           )}
 
-          {/* ⭐ Analyzing Indicator (NEW) */}
+          {/* Analyzing Indicator */}
           {isAnalyzing && (
             <div className="flex justify-start">
               <div
@@ -314,7 +309,7 @@ Feel free to share what's on your mind today. You can type your message or use t
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Chat Input Bar Fixed Bottom */}
+        {/* Chat Input Bar */}
         <div className="relative z-20">
           <ChatInputBar
             message={message}
