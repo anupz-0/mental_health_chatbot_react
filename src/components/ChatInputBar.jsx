@@ -57,7 +57,7 @@ const ChatInputBar = ({ message, setMessage, sendMessage, onVoiceClick }) => {
           {/* Send Button Inside Input */}
           <button
             onClick={sendMessage}
-            className="absolute right-1 top-1.5 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center hover:bg-purple-600/20 transition-all animate-float shadow-[0_0_10px_rgba(138,43,226,0.4)] hover:shadow-[0_0_20px_rgba(138,43,226,0.7)]"
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center hover:bg-purple-600/20 transition-all shadow-[0_0_10px_rgba(138,43,226,0.4)] hover:shadow-[0_0_20px_rgba(138,43,226,0.7)]"
           >
             <FaPaperPlane className="text-white" />
           </button>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaBrain, FaHeart, FaHistory, FaArrowLeft, FaCalendar, FaQuoteLeft } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
-const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick }) => {
+const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onLogout, user }) => {
   const [latestAnalysis, setLatestAnalysis] = useState(null);
   const [analysisHistory, setAnalysisHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -61,7 +61,9 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
           onMentalStateClick={onMentalStateClick}
           onHistoryClick={onHistoryClick}
           onFAQsClick={onFAQsClick}
+          onLogout={onLogout}
           currentPage="mental-state"
+          user={user}
         />
         <div className="flex flex-col flex-1 items-center justify-center bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
           <FaBrain className="text-6xl text-purple-400 mb-4 animate-pulse" />
@@ -87,7 +89,9 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
         onMentalStateClick={onMentalStateClick}
         onHistoryClick={onHistoryClick}
         onFAQsClick={onFAQsClick}
+        onLogout={onLogout}
         currentPage="mental-state"
+        user={user}
       />
 
       <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">

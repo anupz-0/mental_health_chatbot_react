@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FaQuestionCircle, FaArrowLeft, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
-const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick }) => {
+const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onLogout, user }) => {
   const [openIndex, setOpenIndex] = useState(null);
 
   const faqs = [
@@ -16,11 +16,11 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
     },
     {
       question: "How is my mental state analyzed?",
-      answer: "Your speech is analyzed using two AI models: GoEmotions for emotion detection (28 emotions) and a custom BERT model for mental health classification (anxiety, depression, stress, etc.). The system uses keyword-based correction to handle dataset biases."
+      answer: "Your speech is analyzed using two AI models: GoEmotions for emotion detection (28 emotions) and a custom RoBERTa model for mental health classification (Anxiety, Depression, Bipolar, Personality Disorder, Suicidal, Normal). The system achieves 92.92% accuracy."
     },
     {
       question: "Is my data private and secure?",
-      answer: "Your analysis data is stored locally in your browser's localStorage. It never leaves your device unless you explicitly share it. The voice data is processed in real-time and not permanently stored on our servers."
+      answer: "Your analysis history is saved securely to your personal account in a local database. It's tied to your login and not accessible by others. Voice data is processed in real-time and not permanently stored on our servers."
     },
     {
       question: "Can this replace professional therapy?",
@@ -32,11 +32,11 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
     },
     {
       question: "How accurate is the mental health analysis?",
-      answer: "The system achieves 85-95% accuracy depending on the clarity of speech and emotional expression. We use enhanced keyword detection and bias correction to improve anxiety vs. stress classification accuracy."
+      answer: "The system achieves 92.92% test accuracy with a macro F1 of 0.929. Bipolar detection achieves 0.95 F1, Normal 0.97, and Personality Disorder 0.96."
     },
     {
       question: "Can I view my analysis history?",
-      answer: "Yes! Click on the 'History' button in the sidebar to see your past 10 analyses, including timestamps, emotions detected, and mental health states."
+      answer: "Yes! Click on 'History' in the sidebar. Your history is saved to your account and persists across devices and sessions — no more losing data when you clear your browser."
     },
     {
       question: "What should I do if I'm feeling suicidal?",
@@ -48,34 +48,31 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
     }
   ];
 
-  const toggleFAQ = (index) => {
-    setOpenIndex(openIndex === index ? null : index);
-  };
+  const toggleFAQ = (index) => setOpenIndex(openIndex === index ? null : index);
 
   return (
     <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
-      
-      <Sidebar 
-        onHomeClick={onHomeClick}
+
+      <Sidebar
+        onHomeClick       ={onHomeClick}
         onMentalStateClick={onMentalStateClick}
-        onHistoryClick={onHistoryClick}
-        onFAQsClick={onFAQsClick}
-        currentPage="faqs"
+        onHistoryClick    ={onHistoryClick}
+        onFAQsClick       ={onFAQsClick}
+        onLogout          ={onLogout}
+        currentPage       ="faqs"
+        user              ={user}
       />
 
       <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
 
-        {/* Animated Stars Background */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(100)].map((_, i) => (
-            <div 
-              key={i} 
-              className="absolute bg-white rounded-full opacity-20 animate-pulse"
+            <div key={i} className="absolute bg-white rounded-full opacity-20 animate-pulse"
               style={{
-                width: `${Math.random() * 3 + 1}px`,
+                width : `${Math.random() * 3 + 1}px`,
                 height: `${Math.random() * 3 + 1}px`,
-                top: `${Math.random() * 100}%`,
-                left: `${Math.random() * 100}%`,
+                top   : `${Math.random() * 100}%`,
+                left  : `${Math.random() * 100}%`,
                 animationDuration: `${Math.random() * 3 + 2}s`
               }}
             />
@@ -94,28 +91,17 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
                 <p className="text-sm text-purple-300/60">Everything you need to know</p>
               </div>
             </div>
-            
-            <button 
-              onClick={onBack}
-              className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all flex items-center gap-2"
-            >
-              <FaArrowLeft />
-              Back
+            <button onClick={onBack} className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all flex items-center gap-2">
+              <FaArrowLeft />Back
             </button>
           </div>
         </div>
 
-        {/* Main Content */}
+        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 relative z-10">
-          
           <div className="max-w-4xl mx-auto space-y-4">
-            
             {faqs.map((faq, index) => (
-              <div 
-                key={index}
-                className="bg-[#1a1035]/60 backdrop-blur-md border border-purple-500/30 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all"
-              >
-                {/* Question */}
+              <div key={index} className="bg-[#1a1035]/60 backdrop-blur-md border border-purple-500/30 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all">
                 <button
                   onClick={() => toggleFAQ(index)}
                   className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-purple-600/10 transition-all"
@@ -124,54 +110,32 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
                     <div className="flex-shrink-0 w-8 h-8 bg-purple-600/30 rounded-full flex items-center justify-center text-sm font-bold">
                       {index + 1}
                     </div>
-                    <h3 className="text-lg font-semibold text-purple-200">
-                      {faq.question}
-                    </h3>
+                    <h3 className="text-lg font-semibold text-purple-200">{faq.question}</h3>
                   </div>
                   <div className="flex-shrink-0 ml-4">
-                    {openIndex === index ? (
-                      <FaChevronUp className="text-purple-400" />
-                    ) : (
-                      <FaChevronDown className="text-purple-400" />
-                    )}
+                    {openIndex === index ? <FaChevronUp className="text-purple-400" /> : <FaChevronDown className="text-purple-400" />}
                   </div>
                 </button>
-
-                {/* Answer */}
                 {openIndex === index && (
                   <div className="px-6 pb-4 pt-2 bg-[#0a0515]/50 border-t border-purple-500/20">
-                    <p className="text-purple-300/90 leading-relaxed">
-                      {faq.answer}
-                    </p>
+                    <p className="text-purple-300/90 leading-relaxed">{faq.answer}</p>
                   </div>
                 )}
               </div>
             ))}
 
-            {/* Help Section */}
             <div className="mt-8 bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-md border border-purple-500/30 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-purple-300 mb-3">
-                Still have questions?
-              </h3>
-              <p className="text-purple-200 mb-4">
-                If you need additional help or have questions not covered here, please don't hesitate to reach out.
-              </p>
+              <h3 className="text-lg font-semibold text-purple-300 mb-3">Still have questions?</h3>
+              <p className="text-purple-200 mb-4">If you need additional help, please don't hesitate to reach out.</p>
               <div className="flex gap-4">
-                <a
-                  href="mailto:support@mindcare.com"
-                  className="px-6 py-2 bg-purple-600/30 hover:bg-purple-600/50 rounded-full transition-all"
-                >
+                <a href="mailto:support@mindcare.com" className="px-6 py-2 bg-purple-600/30 hover:bg-purple-600/50 rounded-full transition-all">
                   Contact Support
                 </a>
-                <button
-                  onClick={onBack}
-                  className="px-6 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all"
-                >
+                <button onClick={onBack} className="px-6 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all">
                   Back to Home
                 </button>
               </div>
             </div>
-
           </div>
         </div>
 
