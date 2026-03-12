@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Activity, HelpCircle, Clock, LogOut } from 'lucide-react';
+import { Home, Activity, HelpCircle, Clock, LogOut, MessageSquarePlus } from 'lucide-react';
 import logo from '../assets/logo.png';
 
 const Sidebar = ({
   onHomeClick,
+  onNewChat,
   onMentalStateClick,
   onHistoryClick,
   onFAQsClick,
@@ -48,9 +49,20 @@ const Sidebar = ({
     <div className="w-44 min-h-screen bg-gradient-to-b from-[#0a0515] via-[#1a1035] to-[#0a0515] flex flex-col items-center py-6 relative border-r border-purple-500/10">
 
       {/* Logo */}
-      <div className="mb-6 flex flex-col items-center">
+      <div className="mb-6 flex flex-col items-center cursor-pointer" onClick={() => window.location.reload()}>
         <img src={logo} alt="MindCare Logo" className="w-28 h-auto object-contain animate-logoGlow" />
       </div>
+
+      {/* New Chat Button */}
+      {onNewChat && (
+        <button
+          onClick={onNewChat}
+          className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white text-xs font-semibold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105"
+        >
+          <MessageSquarePlus size={16} />
+          <span>New Chat</span>
+        </button>
+      )}
 
       {/* Nav */}
       <div className="flex-1 flex items-center justify-center w-full">
@@ -104,7 +116,7 @@ const Sidebar = ({
 
       {/* Profile Section at Bottom */}
       {user && (
-        <div className="mb-3 relative flex flex-col items-center">
+        <div className="mb-3 mt-6 relative flex flex-col items-center">
           {/* Dropdown menu (slides up) */}
           {profileOpen && (
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 bg-[#1a1035]/95 backdrop-blur-md border border-purple-500/25 rounded-xl overflow-hidden shadow-xl shadow-purple-900/40 animate-fadeIn">

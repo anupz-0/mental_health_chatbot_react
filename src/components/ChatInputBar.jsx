@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FaMicrophone, FaPaperPlane, FaRedo } from 'react-icons/fa';
 
-const ChatInputBar = ({ message, setMessage, sendMessage, onVoiceClick }) => {
+const ChatInputBar = ({ message, setMessage, sendMessage, onVoiceClick, onNewChat }) => {
   const [voiceActive, setVoiceActive] = useState(false);
 
   const handleKeyPress = (e) => {
@@ -22,7 +22,11 @@ const ChatInputBar = ({ message, setMessage, sendMessage, onVoiceClick }) => {
   };
 
   const handleRefresh = () => {
-    window.location.reload();
+    if (onNewChat) {
+      onNewChat();
+    } else {
+      window.location.reload();
+    }
   };
 
   return (

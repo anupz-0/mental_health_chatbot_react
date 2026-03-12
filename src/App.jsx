@@ -10,6 +10,10 @@ import RegisterPage from './components/Registerpage';
 
 const API_BASE = "http://localhost:8000";
 
+// Generate a unique session id (resets on every page load / refresh)
+const generateSessionId = () =>
+  `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
 function App() {
   const [messages, setMessages]       = useState([]);
   const [message, setMessage]         = useState('');
@@ -21,6 +25,9 @@ function App() {
   const [user, setUser]         = useState(null);
   const [authPage, setAuthPage] = useState('login'); // 'login' | 'register'
   const [authReady, setAuthReady] = useState(false);
+
+  // ── Session tracking (new id each page-load / refresh) ──
+  const sessionIdRef = useRef(generateSessionId());
 
   const messagesEndRef = useRef(null);
 
@@ -64,9 +71,31 @@ function App() {
     localStorage.removeItem('user');
     localStorage.removeItem('latestAnalysis');
     localStorage.removeItem('analysisHistory');
+    sessionIdRef.current = generateSessionId(); // new session on logout
     setUser(null);
     setMessages([]);
     setCurrentPage('home');
+  };
+
+  // ── New Chat ─────────────────────────────────────────────
+  const handleNewChat = () => {
+    sessionIdRef.current = generateSessionId();
+    setMessages([]);
+    setMessage('');
+    setIsTyping(false);
+    setIsAnalyzing(false);
+    setCurrentPage('home');
+    // Re-show welcome message
+    setTimeout(() => {
+      setIsTyping(true);
+      setTimeout(() => {
+        setMessages([{
+          text  : `Hello ${user.name}! I'm here to listen and support you.\nFeel free to share what's on your mind today.`,
+          sender: 'bot'
+        }]);
+        setIsTyping(false);
+      }, 800);
+    }, 100);
   };
 
   const getToken = () => localStorage.getItem('token');
@@ -98,7 +127,7 @@ function App() {
       const res = await fetch(`${API_BASE}/analyze`, {
         method : 'POST',
         headers,
-        body   : JSON.stringify({ text }),
+        body   : JSON.stringify({ text, session_id: sessionIdRef.current }),
       });
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
@@ -111,6 +140,7 @@ function App() {
       const isHighRisk   = data.high_risk                 || false;
 
       const analysisData = {
+        sessionId : sessionIdRef.current,
         timestamp : new Date().toISOString(),
         userText  : text,
         highRisk  : isHighRisk,
@@ -205,6 +235,7 @@ function App() {
     onHistoryClick    : handleHistoryClick,
     onFAQsClick       : handleFAQsClick,
     onLogout          : handleLogout,
+    currentSessionId  : sessionIdRef.current,
     user,
   };
 
@@ -219,6 +250,7 @@ function App() {
 
       <Sidebar
         onHomeClick       ={handleHomeClick}
+        onNewChat         ={handleNewChat}
         onMentalStateClick={handleMentalStateClick}
         onHistoryClick    ={handleHistoryClick}
         onFAQsClick       ={handleFAQsClick}
@@ -299,6 +331,7 @@ function App() {
             setMessage ={setMessage}
             sendMessage={sendMessage}
             onVoiceClick={handleVoiceClick}
+            onNewChat  ={handleNewChat}
           />
         </div>
 
