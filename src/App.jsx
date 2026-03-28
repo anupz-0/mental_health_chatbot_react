@@ -1,295 +1,284 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { API_BASE, ENDPOINTS } from './config/api';
 import Sidebar from './components/Sidebar';
 import ChatInputBar from './components/ChatInputBar';
 import VoicePage from './components/VoicePage';
 import MentalStatePage from './components/MentalStatePage';
 import HistoryPage from './components/HistoryPage';
 import FAQsPage from './components/FAQsPage';
+import SessionSummaryPage from './components/SessionSummaryPage';
 import LoginPage from './components/LoginPage';
-import RegisterPage from './components/Registerpage';
+import RegisterPage from './components/RegisterPage';
 
-const API_BASE = "http://localhost:8000";
+function getToken() {
+  return localStorage.getItem('token');
+}
 
-// Generate a unique session id (resets on every page load / refresh)
-const generateSessionId = () =>
-  `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+function authHeaders() {
+  const t = getToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
 
 function App() {
-  const [messages, setMessages]       = useState([]);
-  const [message, setMessage]         = useState('');
-  const [isTyping, setIsTyping]       = useState(false);
+  // ─── Auth state ───
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
+  });
+  const [authPage, setAuthPage] = useState('login');
+
+  // ─── Chat state ───
+  const [messages, setMessages] = useState([]);
+  const [message, setMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentPage, setCurrentPage] = useState('home');
-
-  // ── Auth state ──────────────────────────────────────────
-  const [user, setUser]         = useState(null);
-  const [authPage, setAuthPage] = useState('login'); // 'login' | 'register'
-  const [authReady, setAuthReady] = useState(false);
-
-  // ── Session tracking (new id each page-load / refresh) ──
-  const sessionIdRef = useRef(generateSessionId());
-
+  const sessionIdRef = useRef('session_' + Date.now());
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const [voiceContinueMessages, setVoiceContinueMessages] = useState(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
-  // Check token on mount
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const saved = localStorage.getItem('user');
-    if (token && saved) {
-      setUser(JSON.parse(saved));
-    }
-    setAuthReady(true);
-  }, []);
+  const scrollToBottom = (behavior = 'smooth') => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior });
+    }, 50);
+  };
 
-  // Auto-scroll
+  // Auto-scroll on new messages or typing indicator
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom('smooth');
   }, [messages, isTyping]);
+
+  // Scroll to bottom when returning to home page
+  useEffect(() => {
+    if (currentPage === 'home') {
+      scrollToBottom('instant');
+    }
+  }, [currentPage]);
 
   // Welcome message
   useEffect(() => {
-    if (!user) return;
+    if (user) showWelcome();
+  }, [user]);
+
+  const showWelcome = () => {
     setIsTyping(true);
     const timer = setTimeout(() => {
       setMessages([{
-        text  : `Hello ${user.name}! I'm here to listen and support you.\nFeel free to share what's on your mind today.`,
+        text: `Hello${user?.name ? `, ${user.name}` : ''}! I'm here to listen and support you.\nFeel free to share what's on your mind today. You can type your message or use the speak button to talk to me directly.`,
         sender: 'bot'
       }]);
       setIsTyping(false);
-    }, 800);
+    }, 600);
     return () => clearTimeout(timer);
-  }, [user]);
+  };
 
-  // ── Auth handlers ────────────────────────────────────────
-  const handleLoginSuccess = (userData) => {
-    setUser(userData);
-    setCurrentPage('home');
+  // ─── Auth handlers ───
+  const handleLoginSuccess = (u) => {
+    setUser(u);
+    localStorage.setItem('user', JSON.stringify(u));
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    localStorage.removeItem('latestAnalysis');
-    localStorage.removeItem('analysisHistory');
-    sessionIdRef.current = generateSessionId(); // new session on logout
     setUser(null);
     setMessages([]);
     setCurrentPage('home');
+    sessionIdRef.current = 'session_' + Date.now();
+    setSessionEnded(false);
   };
 
-  // ── New Chat ─────────────────────────────────────────────
+  // ─── Auth gate ───
+  if (!user) {
+    if (authPage === 'register') {
+      return <RegisterPage onLoginSuccess={handleLoginSuccess} onGoLogin={() => setAuthPage('login')} />;
+    }
+    return <LoginPage onLoginSuccess={handleLoginSuccess} onGoRegister={() => setAuthPage('register')} />;
+  }
+
+  // ─── New chat ───
   const handleNewChat = () => {
-    sessionIdRef.current = generateSessionId();
+    sessionIdRef.current = 'session_' + Date.now();
     setMessages([]);
-    setMessage('');
-    setIsTyping(false);
-    setIsAnalyzing(false);
+    setSessionEnded(false);
     setCurrentPage('home');
-    // Re-show welcome message
-    setTimeout(() => {
-      setIsTyping(true);
-      setTimeout(() => {
-        setMessages([{
-          text  : `Hello ${user.name}! I'm here to listen and support you.\nFeel free to share what's on your mind today.`,
-          sender: 'bot'
-        }]);
-        setIsTyping(false);
-      }, 800);
-    }, 100);
+    showWelcome();
   };
 
-  const getToken = () => localStorage.getItem('token');
-
-  // ── Format label ─────────────────────────────────────────
-  const formatLabel = (str) => {
-    return str
-      .replace(/_/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+  // ─── Continue from history ───
+  const handleContinueConversation = async (sid, convType = 'chat') => {
+    sessionIdRef.current = sid;
+    setSessionEnded(false);
+    try {
+      const res = await fetch(`${API_BASE}/api/conversations/${sid}`, { headers: authHeaders() });
+      if (!res.ok) throw new Error('Failed to load conversation');
+      const data = await res.json();
+      if (convType === 'voice') {
+        const voiceMsgs = data.messages.map(m => ({ text: m.content, isUser: m.role === 'user' }));
+        setVoiceContinueMessages(voiceMsgs);
+        setCurrentPage('voice');
+      } else {
+        setMessages(data.messages.map(m => ({ text: m.content, sender: m.role === 'user' ? 'user' : 'bot' })));
+        setCurrentPage('home');
+      }
+    } catch (e) {
+      console.error('Continue conversation error:', e);
+      showWelcome();
+      setCurrentPage('home');
+    }
   };
 
-  // ── Analyze text ─────────────────────────────────────────
+  // ─── Pipeline chat ───
   const analyzeText = async (text) => {
     if (!text.trim()) return;
     setIsAnalyzing(true);
-
-    setMessages(prev => [...prev, {
-      text  : "Analyzing your message...",
-      sender: 'bot'
-    }]);
-
     try {
-      const token   = getToken();
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch(`${API_BASE}/analyze`, {
-        method : 'POST',
-        headers,
-        body   : JSON.stringify({ text, session_id: sessionIdRef.current }),
+      const chatRes = await fetch(`${API_BASE}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ message: text, session_id: sessionIdRef.current })
       });
+      if (!chatRes.ok) throw new Error(`Chat error: ${chatRes.status}`);
+      const chatData = await chatRes.json();
 
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-      const data = await res.json();
+      setIsAnalyzing(false);
+      setIsTyping(false);
 
-      const mentalLabel  = data.mental_state?.label      || 'Unknown';
-      const mentalConf   = data.mental_state?.confidence || 0;
-      const emotionLabel = data.emotion?.label            || null;
-      const emotionConf  = data.emotion?.confidence       || 0;
-      const isHighRisk   = data.high_risk                 || false;
-
-      const analysisData = {
-        sessionId : sessionIdRef.current,
-        timestamp : new Date().toISOString(),
-        userText  : text,
-        highRisk  : isHighRisk,
-        emotion   : emotionLabel ? {
-          label     : formatLabel(emotionLabel),
-          confidence: (emotionConf * 100).toFixed(1),
-          rawLabel  : emotionLabel,
-          rawScore  : emotionConf,
-        } : null,
-        mentalHealth: {
-          label     : formatLabel(mentalLabel),
-          confidence: (mentalConf * 100).toFixed(1),
-          rawLabel  : mentalLabel,
-          rawScore  : mentalConf,
-          riskLevel : data.mental_state?.risk_level || 'Low',
-          allScores : data.mental_state?.all_scores || {},
-        },
-      };
-
-      localStorage.setItem('latestAnalysis', JSON.stringify(analysisData));
-      const history = JSON.parse(localStorage.getItem('analysisHistory') || '[]');
-      history.push(analysisData);
-      if (history.length > 10) history.shift();
-      localStorage.setItem('analysisHistory', JSON.stringify(history));
-
-      setTimeout(() => {
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            text  : "Analysis complete! Click 'Mental State' in the sidebar to see your results.",
-            sender: 'bot',
-          };
-          return updated;
-        });
-      }, 500);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          text: chatData.response,
+          sender: 'bot',
+          tags: null
+        };
+        return newMessages;
+      });
 
     } catch (e) {
-      console.error('Analysis failed:', e);
-      setMessages(prev => {
-        const updated = [...prev];
-        updated[updated.length - 1] = {
-          text  : "I'm having trouble analyzing right now. But I'm still here to listen.",
-          sender: 'bot',
-        };
-        return updated;
-      });
-    } finally {
+      console.error('Pipeline error:', e);
       setIsAnalyzing(false);
+      setIsTyping(false);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          text: "I'm having trouble responding right now. But I'm still here to listen.",
+          sender: 'bot'
+        };
+        return newMessages;
+      });
     }
+  };
+
+  const handleEndSession = async () => {
+    if (messages.length <= 1) {
+      setMessages(prev => [...prev, { text: "No conversation data to summarize yet. Try chatting first!", sender: 'bot' }]);
+      return;
+    }
+    setCurrentPage('summary');
+    sessionIdRef.current = 'session_' + Date.now();
+    setMessages([]);
+    setSessionEnded(false);
+    showWelcome();
   };
 
   const sendMessage = () => {
-    if (!message.trim()) return;
+    if (!message.trim() || sessionEnded) return;
     const userMessage = message.trim();
     setMessages(prev => [...prev, { text: userMessage, sender: 'user' }]);
     setMessage('');
+    setMessages(prev => [...prev, { text: "Analyzing your message...", sender: 'bot' }]);
+    setIsTyping(true);
     analyzeText(userMessage);
   };
 
-  // ── Navigation ───────────────────────────────────────────
+  // ─── Clear history → also reset current chat ───
+  const handleHistoryClear = () => {
+    sessionIdRef.current = 'session_' + Date.now();
+    setMessages([]);
+    setSessionEnded(false);
+    showWelcome();
+  };
+
+  // ─── Navigation ───
   const handleHomeClick        = () => setCurrentPage('home');
-  const handleVoiceClick       = () => setCurrentPage('voice');
+  const handleVoiceClick = () => {
+    sessionIdRef.current = 'session_' + Date.now();
+    setVoiceContinueMessages(null);
+    setCurrentPage('voice');
+  };
   const handleMentalStateClick = () => setCurrentPage('mental-state');
   const handleHistoryClick     = () => setCurrentPage('history');
   const handleFAQsClick        = () => setCurrentPage('faqs');
+  const handleSummaryClick     = () => setCurrentPage('summary');
 
-  // ── Auth gate ────────────────────────────────────────────
-  if (!authReady) return null; // wait for localStorage check
-
-  if (!user) {
-    if (authPage === 'register') {
-      return (
-        <RegisterPage
-          onLoginSuccess={handleLoginSuccess}
-          onGoLogin={() => setAuthPage('login')}
-        />
-      );
-    }
-    return (
-      <LoginPage
-        onLoginSuccess={handleLoginSuccess}
-        onGoRegister={() => setAuthPage('register')}
-      />
-    );
-  }
-
-  // ── Pages ────────────────────────────────────────────────
-  const sharedProps = {
-    onBack            : handleHomeClick,
-    onHomeClick       : handleHomeClick,
+  const navProps = {
+    onHomeClick: handleHomeClick,
     onMentalStateClick: handleMentalStateClick,
-    onHistoryClick    : handleHistoryClick,
-    onFAQsClick       : handleFAQsClick,
-    onLogout          : handleLogout,
-    currentSessionId  : sessionIdRef.current,
-    user,
+    onHistoryClick: handleHistoryClick,
+    onFAQsClick: handleFAQsClick,
+    onSummaryClick: handleSummaryClick,
+    user, onLogout: handleLogout, onNewChat: handleNewChat,
   };
 
-  if (currentPage === 'voice')        return <VoicePage       {...sharedProps} />;
-  if (currentPage === 'mental-state') return <MentalStatePage {...sharedProps} />;
-  if (currentPage === 'history')      return <HistoryPage     {...sharedProps} />;
-  if (currentPage === 'faqs')         return <FAQsPage        {...sharedProps} />;
+  if (currentPage === 'voice') {
+    return <VoicePage onBack={handleHomeClick} {...navProps} currentSessionId={sessionIdRef.current} initialMessages={voiceContinueMessages} onMessagesLoaded={() => setVoiceContinueMessages(null)} />;
+  }
+  if (currentPage === 'mental-state') {
+    return <MentalStatePage onBack={handleHomeClick} {...navProps} currentSessionId={sessionIdRef.current} />;
+  }
+  if (currentPage === 'history') {
+    return <HistoryPage onBack={handleHomeClick} {...navProps} onContinueConversation={handleContinueConversation} onHistoryCleared={handleHistoryClear} />;
+  }
+  if (currentPage === 'summary') {
+    return <SessionSummaryPage onBack={handleHomeClick} {...navProps} />;
+  }
+  if (currentPage === 'faqs') {
+    return <FAQsPage onBack={handleHomeClick} {...navProps} />;
+  }
 
-  // ── Home ─────────────────────────────────────────────────
+  // Home (Chat) Page
   return (
-    <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#f0f9f4] text-[#2d3436] overflow-hidden">
+      <Sidebar {...navProps} currentPage={currentPage} />
 
-      <Sidebar
-        onHomeClick       ={handleHomeClick}
-        onNewChat         ={handleNewChat}
-        onMentalStateClick={handleMentalStateClick}
-        onHistoryClick    ={handleHistoryClick}
-        onFAQsClick       ={handleFAQsClick}
-        onLogout          ={handleLogout}
-        currentPage       ={currentPage}
-        user              ={user}
-      />
-
-      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
-
+      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#f0f9f4] via-[#fef9f5] to-[#f0f7ff]">
         {/* Stars */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute bg-white rounded-full opacity-30 animate-pulse"
-              style={{
-                width : `${Math.random() * 2 + 1}px`,
-                height: `${Math.random() * 2 + 1}px`,
-                top   : `${Math.random() * 100}%`,
-                left  : `${Math.random() * 100}%`,
-                animationDuration: `${Math.random() * 3 + 2}s`
-              }}
-            />
+            <div key={i} className="absolute bg-green-200/40 rounded-full animate-pulse"
+              style={{ width: `${Math.random()*3+1}px`, height: `${Math.random()*3+1}px`,
+                top: `${Math.random()*100}%`, left: `${Math.random()*100}%`,
+                animationDuration: `${Math.random()*3+2}s` }} />
           ))}
         </div>
 
+        {/* End Session */}
+        {!sessionEnded && messages.length > 1 && (
+          <div className="relative z-20 flex justify-end p-4 pb-0 shrink-0">
+            <button onClick={handleEndSession}
+              className="px-4 py-2 rounded-full bg-orange-200/40 border border-orange-300/30 text-orange-800 text-sm hover:bg-orange-200/60 transition-all font-medium">
+              End Session
+            </button>
+          </div>
+        )}
+
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10">
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10 scrollbar-thin scrollbar-thumb-mint-300/40 scrollbar-track-transparent"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(165,214,167,0.4) transparent',
+          }}
+        >
           {messages.map((msg, index) => (
             <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`inline-block px-4 py-2 rounded-2xl backdrop-blur-md shadow-md break-words transition-transform duration-500 transform whitespace-pre-line
-                  ${msg.sender === 'user'
-                    ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                    : 'bg-[#1a1035]/60 border border-purple-500/20 text-purple-200 animate-slideUp'
-                  }`}
-                style={{ maxWidth: '70%' }}
-              >
+              <div className={`inline-block px-4 py-2 rounded-2xl shadow-sm border break-words transition-transform duration-500 transform whitespace-pre-line text-justify
+                ${msg.sender === 'user'
+                  ? 'bg-gradient-to-r from-[#81d4fa] to-[#4fc3f7] text-slate-800 border-[#81d4fa]/30'
+                  : 'bg-[#fff3e0] border-[#ffe0b2] text-slate-800 animate-slideUp'}`}
+                style={{ maxWidth: '70%' }}>
                 {msg.text}
               </div>
             </div>
@@ -297,12 +286,12 @@ function App() {
 
           {isTyping && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#1a1035]/60 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
-                <span className="text-purple-300 mr-2">Bot is typing</span>
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl shadow-sm bg-[#fff3e0] border border-[#ffe0b2] animate-fadeIn" style={{ maxWidth: '40%' }}>
+                <span className="text-orange-800 mr-2 text-sm font-medium">Aria is typing</span>
                 <div className="flex items-center space-x-1">
-                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce"></span>
-                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce delay-200"></span>
-                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce delay-400"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce delay-200"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce delay-400"></span>
                 </div>
               </div>
             </div>
@@ -310,12 +299,12 @@ function App() {
 
           {isAnalyzing && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#1a1035]/60 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
-                <span className="text-purple-300 mr-2">Analyzing emotions</span>
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl shadow-sm bg-[#e0f2f1] border border-[#b2dfdb] animate-fadeIn" style={{ maxWidth: '40%' }}>
+                <span className="text-teal-800 mr-2 text-sm font-medium">Analyzing emotions</span>
                 <div className="flex items-center space-x-1">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></span>
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce delay-200"></span>
-                  <span className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-400"></span>
+                  <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce delay-200"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce delay-400"></span>
                 </div>
               </div>
             </div>
@@ -326,15 +315,9 @@ function App() {
 
         {/* Input */}
         <div className="relative z-20">
-          <ChatInputBar
-            message    ={message}
-            setMessage ={setMessage}
-            sendMessage={sendMessage}
-            onVoiceClick={handleVoiceClick}
-            onNewChat  ={handleNewChat}
-          />
+          <ChatInputBar message={message} setMessage={setMessage} sendMessage={sendMessage}
+            onVoiceClick={handleVoiceClick} onNewChat={handleNewChat} />
         </div>
-
       </div>
     </div>
   );
